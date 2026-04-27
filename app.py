@@ -7,10 +7,9 @@ import string
 
 app = Flask(__name__)
 
-# 👉 external data source (you can change later)
 BASE_URL = "https://yash-code-with-ai.alphamovies.workers.dev/"
 
-# ------------------ DATABASE ------------------
+# ---------------- DATABASE ----------------
 def init_db():
     conn = sqlite3.connect("keys.db")
     c = conn.cursor()
@@ -25,7 +24,7 @@ def init_db():
 
 init_db()
 
-# ------------------ KEY SYSTEM ------------------
+# ---------------- KEY SYSTEM ----------------
 def generate_key(duration):
     key = "VERNEX-" + ''.join(random.choices(string.ascii_uppercase + string.digits, k=12))
 
@@ -54,7 +53,7 @@ def is_valid(key):
 
     return time.time() < row[0]
 
-# ------------------ PLANS ------------------
+# ---------------- PLANS ----------------
 DURATIONS = {
     "1d": 86400,
     "2d": 172800,
@@ -65,11 +64,32 @@ DURATIONS = {
     "lifetime": "lifetime"
 }
 
-# ------------------ ROUTES ------------------
+# ---------------- CLEAN FUNCTION ----------------
+def clean_data(data):
+    remove_keys = [
+        "branding",
+        "developer",
+        "owner_contact",
+        "processed_by"
+    ]
+
+    if isinstance(data, dict):
+        return {
+            k: clean_data(v)
+            for k, v in data.items()
+            if k not in remove_keys
+        }
+    elif isinstance(data, list):
+        return [clean_data(i) for i in data]
+
+    return data
+
+# ---------------- ROUTES ----------------
 @app.route("/")
 def home():
     return "Vernex API + Key System LIVE 🚀"
 
+# 🔑 Generate key
 @app.route("/generate")
 def generate():
     plan = request.args.get("plan", "1d")
@@ -85,6 +105,7 @@ def generate():
         "expires_at": expiry
     })
 
+# 📞 Main API
 @app.route("/api/numinfo")
 def numinfo():
     num = request.args.get("num")
@@ -99,10 +120,19 @@ def numinfo():
             "key": "7189814021"
         }, timeout=10)
 
-        return jsonify(res.json())
+        raw_data = res.json()
+
+        # 🧹 Clean unwanted fields
+        data = clean_data(raw_data)
+
+        # ✅ Add your branding
+        data["owner"] = "VERNEX API"
+
+        return jsonify(data)
 
     except Exception as e:
         return jsonify({"error": str(e)})
 
+# ---------------- RUN ----------------
 if __name__ == "__main__":
     app.run()
